@@ -1,0 +1,74 @@
+name: Tests Automáticos con JUnit
+
+# Cuándo se ejecuta este workflow
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:  # Permite ejecutar manualmente desde GitHub
+
+jobs:
+  test:
+    name: Ejecutar Tests JUnit
+    runs-on: ubuntu-latest
+    
+    steps:
+    # 1. Descargar el código del repositorio
+    - name: 📥 Checkout código
+      uses: actions/checkout@v4
+    
+    # 2. Configurar Java
+    - name: ☕ Configurar JDK 11
+      uses: actions/setup-java@v4
+      with:
+        java-version: '11'
+        distribution: 'temurin'
+        cache: 'maven'
+    
+    # 3. Verificar la instalación de Maven
+    - name: 🔍 Verificar Maven
+      run: mvn --version
+    
+    # 4. Compilar el proyecto
+    - name: 🔨 Compilar proyecto
+      run: mvn clean compile
+    
+    # 5. Ejecutar las pruebas unitarias
+    - name: 🧪 Ejecutar tests JUnit
+      run: mvn test
+    
+    # 6. Generar reporte de cobertura con JaCoCo
+    - name: 📊 Generar reporte de cobertura
+      run: mvn jacoco:report
+    
+    # 7. Subir resultados de los tests (se pueden descargar después)
+    - name: 📤 Publicar resultados de tests
+      if: always()  # Ejecuta incluso si los tests fallan
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results
+        path: target/surefire-reports/
+    
+    # 8. Subir reporte de cobertura
+    - name: 📈 Publicar reporte de cobertura
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: target/site/jacoco/
+    
+    # 9. Mostrar resumen de los tests
+    - name: ✅ Resumen de tests
+      if: always()
+      run: |
+        echo "========================================="
+        echo "🎯 RESUMEN DE EJECUCIÓN DE TESTS"
+        echo "========================================="
+        if [ -f target/surefire-reports/*.xml ]; then
+          echo "✅ Tests ejecutados correctamente"
+          echo "📁 Reportes disponibles en Artifacts"
+        else
+          echo "⚠  No se encontraron reportes de tests"
+        fi
+        echo "========================================="

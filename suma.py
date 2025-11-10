@@ -8,7 +8,7 @@ g = 70
 h = 80
 i = 90
 j = 100
-suma = a + c
+suma = a + d
 print(suma)
 suma = a + b + c + d + e + f + g + h + i + j
 print(suma)

@@ -49,6 +49,7 @@ class PedidoProveedor:
         for p in self.productos:
             print(f" - {p}")
         print(f"\nTOTAL: ${self.total:.2f}")
+        ###
 
     def __repr__(self):
         return f"PedidoProveedor(proveedor='{self.proveedor}', estado='{self.estado}', total={self.total})"

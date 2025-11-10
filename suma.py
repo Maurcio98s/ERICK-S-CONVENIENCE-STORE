@@ -7,7 +7,7 @@ f = 60
 g = 70
 h = 80
 i = 90
-j = 100
+j = 1000
 suma = a + d
 print(suma)
 suma = a + b + c + d + e + f + g + h + i + j

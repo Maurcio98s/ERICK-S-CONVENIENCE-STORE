@@ -233,4 +233,3 @@ class IngresosApp(tk.Tk):
 if __name__ == "__main__":
     app = IngresosApp()
     app.mainloop()
-

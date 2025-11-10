@@ -6,7 +6,7 @@ def main() -> None:
         print("Entrada inválida. Asegúrate de ingresar números.")
         return
 
-    resultado = numero_1 - numero_2
+    resultado = numero_1 * numero_2
     print(f"La suma es: {resultado}")
 
 

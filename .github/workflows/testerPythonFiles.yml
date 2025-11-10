@@ -1,0 +1,51 @@
+name: Análisis estático de código Python
+
+on:
+  push:
+    paths:
+      - '**'
+  pull_request:
+    paths:
+      - '**'
+
+jobs:
+  static-analysis:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Verificar si hay archivos Python modificados
+        id: check_py
+        run: |
+          FILES=$(git diff --name-only HEAD~1 HEAD | grep '\.py$' || true)
+          if [ -z "$FILES" ]; then
+            echo "no es un archivo python"
+            echo "is_python=false" >> $GITHUB_OUTPUT
+          else
+            echo "Se encontraron archivos Python:"
+            echo "$FILES"
+            echo "is_python=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Configurar Python
+        if: steps.check_py.outputs.is_python == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias del analizador
+        if: steps.check_py.outputs.is_python == 'true'
+        run: |
+          pip install flake8
+
+      - name: Ejecutar análisis estático con flake8
+        if: steps.check_py.outputs.is_python == 'true'
+        run: |
+          echo "Ejecutando análisis estático..."
+          flake8 . --statistics --count --max-line-length=120
+
+      - name: Mostrar mensaje si no hay archivos Python
+        if: steps.check_py.outputs.is_python == 'false'
+        run: echo "no es un archivo python"

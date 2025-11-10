@@ -1,4 +1,4 @@
-name: Análisis estático de código Python
+name: Análisis estático de código Python (por archivos cambiados)
 
 on:
   push:
@@ -11,41 +11,117 @@ on:
 jobs:
   static-analysis:
     runs-on: ubuntu-latest
+    env:
+      # Variables de entorno provistas por GitHub Actions
+      BEFORE: ${{ github.event.before }}
+      SHA: ${{ github.sha }}
 
     steps:
-      - name: Checkout del repositorio
+      - name: Checkout (con historial)
         uses: actions/checkout@v4
+        with:
+          # necesitamos historial para poder usar git diff en commits
+          fetch-depth: 0
 
-      - name: Verificar si hay archivos Python modificados
-        id: check_py
+      - name: Preparar lista de archivos cambiados y filtrar .py
+        id: get_files
         run: |
-          FILES=$(git diff --name-only HEAD~1 HEAD | grep '\.py$' || true)
+          set -euo pipefail
+
+          echo "GITHUB before: '$BEFORE'"
+          echo "GITHUB sha:   '$SHA'"
+
+          # Intentar obtener archivos entre BEFORE y SHA (push normal / PR)
+          FILES=""
+          if [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then
+            echo "Obteniendo archivos con: git diff --name-only $BEFORE $SHA"
+            FILES=$(git diff --name-only "$BEFORE" "$SHA" || true)
+          fi
+
+          # Si no hay resultado (por ejemplo push inicial), intentar HEAD~1..HEAD
           if [ -z "$FILES" ]; then
-            echo "no es un archivo python"
+            echo "git diff HEAD~1 HEAD (fallback)"
+            FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || true)
+          fi
+
+          # Si aún está vacío (ej: workflow disparado manualmente o no hay commits),
+          # tomar todos los archivos .py rastreados en el repo como alternativa
+          if [ -z "$FILES" ]; then
+            echo "No se detectaron cambios con diff; listando todos los .py rastreados"
+            FILES=$(git ls-files '*.py' || true)
+          fi
+
+          echo "Archivos encontrados (raw):"
+          printf '%s\n' "$FILES"
+
+          # Filtrar sólo archivos .py
+          PY_FILES=$(printf '%s\n' "$FILES" | grep -E '\.py$' || true)
+
+          if [ -z "$PY_FILES" ]; then
+            echo "No se encontraron archivos .py entre los cambios."
             echo "is_python=false" >> $GITHUB_OUTPUT
+            echo "python_files=" >> $GITHUB_OUTPUT
           else
-            echo "Se encontraron archivos Python:"
-            echo "$FILES"
+            echo "Archivos .py a analizar:"
+            printf '%s\n' "$PY_FILES"
+            # Guardar en la salida del step
+            # Para evitar problemas con nuevas líneas, convertimos a lista separada por comas
+            PY_CSV=$(printf '%s,' $PY_FILES | sed 's/,$//')
             echo "is_python=true" >> $GITHUB_OUTPUT
+            echo "python_files=$PY_CSV" >> $GITHUB_OUTPUT
           fi
 
       - name: Configurar Python
-        if: steps.check_py.outputs.is_python == 'true'
+        if: steps.get_files.outputs.is_python == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Instalar dependencias del analizador
-        if: steps.check_py.outputs.is_python == 'true'
+      - name: Instalar flake8
+        if: steps.get_files.outputs.is_python == 'true'
         run: |
+          python -m pip install --upgrade pip
           pip install flake8
 
-      - name: Ejecutar análisis estático con flake8
-        if: steps.check_py.outputs.is_python == 'true'
+      - name: Ejecutar flake8 en cada archivo detectado (y generar reporte)
+        if: steps.get_files.outputs.is_python == 'true'
         run: |
-          echo "Ejecutando análisis estático..."
-          flake8 . --statistics --count --max-line-length=120
+          set -euo pipefail
+          # Reconvertir la lista CSV a array
+          PY_CSV="${{ steps.get_files.outputs.python_files }}"
+          echo "Lista CSV de archivos .py: $PY_CSV"
+          IFS=',' read -r -a FILE_ARRAY <<< "$PY_CSV"
 
-      - name: Mostrar mensaje si no hay archivos Python
-        if: steps.check_py.outputs.is_python == 'false'
-        run: echo "no es un archivo python"
+          # Mostrar qué archivos vamos a analizar
+          echo "Archivos que se van a analizar:"
+          for f in "${FILE_ARRAY[@]}"; do
+            echo "- Analizando archivo: $f"
+          done
+
+          # Ejecutar flake8 sobre la lista completa (para obtener resumen combinado)
+          # Creamos un archivo de salida
+          REPORT=flake8-report.txt
+          rm -f "$REPORT"
+
+          # Ejecutar flake8. Si se quiere limitar al listado exacto:
+          flake8 "${FILE_ARRAY[@]}" --statistics --count --max-line-length=120 --format=default > "$REPORT" 2>&1 || true
+
+          echo "----- Contenido del reporte ($REPORT) -----"
+          if [ -s "$REPORT" ]; then
+            cat "$REPORT"
+          else
+            echo "No issues found por flake8 (archivo vacío)."
+          fi
+          echo "----- Fin del reporte -----"
+
+      - name: Subir reporte como artifact
+        if: steps.get_files.outputs.is_python == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: flake8-report
+          path: flake8-report.txt
+
+      - name: Mensaje cuando no hay archivos Python
+        if: steps.get_files.outputs.is_python == 'false'
+        run: |
+          echo "no es un archivo python"

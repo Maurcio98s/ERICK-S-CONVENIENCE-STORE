@@ -8,7 +8,7 @@ def editar_cantidad(producto, nueva_cantidad):
     Modifica la cantidad de un producto dentro de un pedido.
     """
     if nueva_cantidad <= 0:
-        raise ValueError("La cantidad debe ser mayor a 0")
+        raise ValueError("La cantidad debe ser mayor a 00")
 
     producto.cantidad = nueva_cantidad
     return f"Cantidad actualizada a {nueva_cantidad} para {producto.nombre}"

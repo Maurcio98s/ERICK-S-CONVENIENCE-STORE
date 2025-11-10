@@ -42,7 +42,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install flake8 flake8-html safety
+          pip install flake8 flake8-html safety pytest
 
       - name: Run Flake8 (Code Style)
         run: |
@@ -58,6 +58,27 @@ jobs:
           else
             echo "No se encontró requirements.txt. Saltando revisión de dependencias." > safety_report.txt
           fi
+
+      - name: Unit Test for suma.py (if present)
+        run: |
+          if [ -f "suma.py" ]; then
+            echo "🧪 Ejecutando prueba unitaria para suma.py..."
+            # Crear prueba temporal
+            echo '
+            import builtins
+            import suma
+
+            def test_suma(monkeypatch, capsys):
+                inputs = iter(["3", "5"])
+                monkeypatch.setattr(builtins, "input", lambda _: next(inputs))
+                suma.main()
+                out, _ = capsys.readouterr()
+                assert "La suma es: 8.0" in out
+            ' > test_suma.py
+              pytest -v --maxfail=1 --disable-warnings -q
+            else
+              echo "ℹ️ No se encontró suma.py. Saltando prueba unitaria."
+            fi
 
       - name: Upload reports
         uses: actions/upload-artifact@v4

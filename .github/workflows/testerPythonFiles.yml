@@ -65,20 +65,20 @@ jobs:
             echo "🧪 Ejecutando prueba unitaria para suma.py..."
             # Crear prueba temporal
             echo '
-            import builtins
-            import suma
+          import builtins
+          import suma
 
-            def test_suma(monkeypatch, capsys):
-                inputs = iter(["3", "5"])
-                monkeypatch.setattr(builtins, "input", lambda _: next(inputs))
-                suma.main()
-                out, _ = capsys.readouterr()
-                assert "La suma es: 8.0" in out
-            ' > test_suma.py
+          def test_suma(monkeypatch, capsys):
+              inputs = iter(["3", "5"])
+              monkeypatch.setattr(builtins, "input", lambda _: next(inputs))
+              suma.main()
+              out, _ = capsys.readouterr()
+              assert "La suma es: 8.0" in out
+              ' > test_suma.py
               pytest -v --maxfail=1 --disable-warnings -q
-            else
-              echo "ℹ️ No se encontró suma.py. Saltando prueba unitaria."
-            fi
+          else
+            echo "ℹ️ No se encontró suma.py. Saltando prueba unitaria."
+          fi
 
       - name: Upload reports
         uses: actions/upload-artifact@v4

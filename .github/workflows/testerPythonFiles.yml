@@ -2,9 +2,9 @@ name: Python Code Quality and Security Check
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main ]
 
 jobs:
   check:
@@ -15,24 +15,17 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Search for Python files
-        id: check_py
+        id: find_files
         run: |
-          echo "Buscando archivos Python en el repositorio..."
+          echo "Buscando archivos Python..."
           PY_FILES=$(find . -type f -name "*.py")
           if [ -z "$PY_FILES" ]; then
-            echo "No se encontraron archivos Python. Finalizando ejecución."
-            echo "found=false" >> $GITHUB_OUTPUT
-          else
-            echo "Archivos detectados:"
-            echo "$PY_FILES"
-            echo "found=true" >> $GITHUB_OUTPUT
+            echo "❌ No se encontraron archivos Python. Terminando flujo."
+            exit 1
           fi
-
-      - name: Cancel if no Python files
-        if: steps.check_py.outputs.found == 'false'
-        run: |
-          echo "Este repositorio no contiene archivos Python. No se realizará ningún análisis."
-          exit 0
+          echo "✅ Archivos encontrados:"
+          echo "$PY_FILES"
+          echo "py_files=$PY_FILES" >> $GITHUB_OUTPUT
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -47,22 +40,25 @@ jobs:
       - name: Run Flake8 (Code Style)
         run: |
           echo "Ejecutando análisis de estilo con Flake8..."
-          flake8 . --exit-zero --format=html --htmldir=flake8_report
-          echo "Análisis de estilo finalizado."
+          mkdir -p flake8_report
+          # Ejecutar sobre todos los .py encontrados
+          flake8 $(find . -type f -name "*.py") --exit-zero --format=html --htmldir=flake8_report
+          echo "✅ Análisis de estilo completado. Resultados guardados en flake8_report/"
 
       - name: Run Safety (Dependency Security)
         run: |
-          echo "Ejecutando revisión de vulnerabilidades con Safety..."
+          echo "Ejecutando análisis de seguridad con Safety..."
           if [ -f "requirements.txt" ]; then
-            safety check -r requirements.txt --full-report > safety_report.txt || true
+            safety check --file=requirements.txt --full-report > safety_report.txt
           else
-            echo "No se encontró requirements.txt. Saltando revisión de dependencias." > safety_report.txt
+            echo "⚠️ No se encontró requirements.txt. Saltando revisión de dependencias." > safety_report.txt
           fi
+          echo "✅ Revisión de seguridad completada. Informe guardado en safety_report.txt"
 
       - name: Upload reports
         uses: actions/upload-artifact@v4
         with:
-          name: python-analysis-reports
+          name: code_quality_reports
           path: |
-            flake8_report
+            flake8_report/
             safety_report.txt
